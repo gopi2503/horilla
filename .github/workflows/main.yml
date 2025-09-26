@@ -3,26 +3,43 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main
+      - 1.0   # Run only when code is pushed to main branch
+  pull_request:
 
 jobs:
-  build-test:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # Step 1: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
+      # Step 2: Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
+      # Step 3: Install dependencies
       - name: Install dependencies
         run: npm install
 
+      # Step 4: Run tests (skip if none)
       - name: Run tests
-        run: npm test || echo "No tests"
+        run: npm test || echo "No tests configured"
 
-      - name: Build app
-        run: npm run build || echo "No build step"
+      # Step 5: Build app (skip if not needed)
+      - name: Build application
+        run: npm run build || echo "No build step configured"
+
+      # Step 6: Upload build artifact (useful for deployment)
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-output
+          path: |
+            build
+            dist
+            .next
+            # add other build output directories if needed
