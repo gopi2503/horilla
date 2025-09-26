@@ -35,7 +35,7 @@ jobs:
     - name: Remote: install/update, migrate, collectstatic, restart
       run: |
         ssh -o StrictHostKeyChecking=no -p ${{ secrets.EC2_PORT }} \
-        ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
+        ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'bash -s' <<'REMOTE_CMDS'
           set -e
           cd ${{ secrets.APP_DIR }}
 
@@ -48,7 +48,7 @@ jobs:
           pip install -r requirements.txt
 
           if [ ! -f .env ]; then
-            echo '.env not found — aborting' >&2
+            echo ".env not found — aborting" >&2
             exit 1
           fi
 
@@ -56,4 +56,4 @@ jobs:
           python manage.py collectstatic --noinput
 
           sudo systemctl restart horilla.service
-        "
+        REMOTE_CMDS
