@@ -1,8 +1,8 @@
-name: CI/CD — Deploy
+name: CI/CD - Deploy to EC2
 
 on:
   push:
-    branches: [ "1.0" ]
+    branches: [ "main" ]
 
 jobs:
   deploy:
@@ -19,23 +19,26 @@ jobs:
 
     - name: Ensure remote directory exists
       run: |
-        ssh -o StrictHostKeyChecking=no -p ${{ secrets.EC2_PORT }} ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p ${{ secrets.APP_DIR }}"
-      env:
-        SSH_AUTH_SOCK: ${{ env.SSH_AUTH_SOCK }}
+        ssh -o StrictHostKeyChecking=no -p ${{ secrets.EC2_PORT }} \
+        ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p ${{ secrets.APP_DIR }}"
 
     - name: Rsync project to EC2 (excludes venv, .env, .git, media)
       run: |
-        rsync -avz --delete --exclude='.git' --exclude='venv' --exclude='.env' --exclude='media' --exclude='node_modules' ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.APP_DIR }}/
-      env:
-        SSH_AUTH_SOCK: ${{ env.SSH_AUTH_SOCK }}
+        rsync -avz --delete \
+          --exclude='.git' \
+          --exclude='venv' \
+          --exclude='.env' \
+          --exclude='media' \
+          --exclude='node_modules' \
+          ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.APP_DIR }}/
 
     - name: Remote: install/update, migrate, collectstatic, restart
       run: |
-        ssh -o StrictHostKeyChecking=no -p ${{ secrets.EC2_PORT }} ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no -p ${{ secrets.EC2_PORT }} \
+        ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
           set -e
           cd ${{ secrets.APP_DIR }}
 
-          # create venv if missing
           if [ ! -d venv ]; then
             python3 -m venv venv
           fi
@@ -44,9 +47,8 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-          # ensure .env exists on server (we keep it out of the repo)
           if [ ! -f .env ]; then
-            echo ".env not found — aborting" >&2
+            echo '.env not found — aborting' >&2
             exit 1
           fi
 
@@ -54,7 +56,4 @@ jobs:
           python manage.py collectstatic --noinput
 
           sudo systemctl restart horilla.service
-          sudo systemctl status horilla.service --no-pager
-        EOF
-      env:
-        SSH_AUTH_SOCK: ${{ env.SSH_AUTH_SOCK }}
+        "
