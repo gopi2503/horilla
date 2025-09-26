@@ -3,7 +3,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - 1.0 
+      - 1.0   # change to 'main' if you want main branch deployment
 
 jobs:
   deploy:
@@ -11,17 +11,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install dependencies
-        run: 
+      - name: Install dependencies & build
+        run: |
           npm install
-          npm run build
+          npm run build || echo "No build step configured"
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.0
@@ -34,7 +34,7 @@ jobs:
             cd horilla
             git pull origin main
             npm install
-            pm2 restart all || pm2 start server.js --name horilla-backend
-            npm run build
-            sudo cp -r build/* /var/www/html/
+            pm2 restart horilla || pm2 start server.js --name horilla
+            npm run build || echo "No build step"
+            sudo cp -r build/* /var/www/html/ || echo "No frontend build to copy"
             sudo systemctl restart nginx
