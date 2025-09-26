@@ -1,40 +1,60 @@
-name: Deploy to EC2
+name: CI/CD — Deploy to EC2
 
 on:
   push:
-    branches:
-      - 1.0   # change to 'main' if you want main branch deployment
+    branches: [ "1.0" ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
+    - name: Start ssh-agent and add key
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Install dependencies & build
-        run: |
-          npm install
-          npm run build || echo "No build step configured"
+    - name: Ensure remote directory exists
+      run: |
+        ssh -o StrictHostKeyChecking=no -p ${{ secrets.EC2_PORT }} ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p ${{ secrets.APP_DIR }}"
+      env:
+        SSH_AUTH_SOCK: ${{ env.SSH_AUTH_SOCK }}
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd /home/ubuntu/horilla || git clone https://github.com/gopi2503/horilla.git
-            cd horilla
-            git pull origin main
-            npm install
-            pm2 restart horilla || pm2 start server.js --name horilla
-            npm run build || echo "No build step"
-            sudo cp -r build/* /var/www/html/ || echo "No frontend build to copy"
-            sudo systemctl restart nginx
+    - name: Rsync project to EC2 (excludes venv, .env, .git, media)
+      run: |
+        rsync -avz --delete --exclude='.git' --exclude='venv' --exclude='.env' --exclude='media' --exclude='node_modules' ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.APP_DIR }}/
+      env:
+        SSH_AUTH_SOCK: ${{ env.SSH_AUTH_SOCK }}
+
+    - name: Remote: install/update, migrate, collectstatic, restart
+      run: |
+        ssh -o StrictHostKeyChecking=no -p ${{ secrets.EC2_PORT }} ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          set -e
+          cd ${{ secrets.APP_DIR }}
+
+          # create venv if missing
+          if [ ! -d venv ]; then
+            python3 -m venv venv
+          fi
+
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+          # ensure .env exists on server (we keep it out of the repo)
+          if [ ! -f .env ]; then
+            echo ".env not found — aborting" >&2
+            exit 1
+          fi
+
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
+
+          sudo systemctl restart horilla.service
+          sudo systemctl status horilla.service --no-pager
+        EOF
+      env:
+        SSH_AUTH_SOCK: ${{ env.SSH_AUTH_SOCK }}
