@@ -3,7 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - 1.0   # Run only when code is pushed to main branch
+      - 1.0   # Trigger only on push to main
   pull_request:
 
 jobs:
@@ -13,11 +13,11 @@ jobs:
     steps:
       # Step 1: Checkout repo
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Step 2: Setup Node.js
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
@@ -25,17 +25,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Step 4: Run tests (skip if none)
+      # Step 4: Run tests (skip if none exist)
       - name: Run tests
         run: npm test || echo "No tests configured"
 
-      # Step 5: Build app (skip if not needed)
+      # Step 5: Build app (skip if no build script)
       - name: Build application
         run: npm run build || echo "No build step configured"
 
-      # Step 6: Upload build artifact (useful for deployment)
+      # Step 6: Upload build artifact (fixed v4)
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-output
           path: |
