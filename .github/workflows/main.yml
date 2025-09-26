@@ -19,10 +19,7 @@ jobs:
           node-version: 18
 
       - name: Install dependencies
-        run: |
-          cd backend
-          npm install
-          cd ../frontend
+        run: 
           npm install
           npm run build
 
